@@ -137,7 +137,7 @@ def roll(message):
     if not user or not wallet_address:
         return
     if not add_user(wallet_address):
-        bot.reply_to(message, "Please do not hurry")
+        bot.reply_to(message, "Please do not hurry, previous transaction is running...")
         return
 
     args = message.text.split()
@@ -173,11 +173,12 @@ def roll(message):
     #     remove_user(wallet_address)
     #     return
 
-    dice_response = bot.send_dice(message.chat.id, emoji=emoji)
+    dice_response = bot.send_dice(message.chat.id, emoji=emoji, reply_to_message_id=message.id)
     dice_roll = dice_response.dice.value
     # bot.reply_to(message, f"You rolled a {dice_roll}!")
 
     payout = int(coefs[dice_roll - 1] * TOKENS_TO_ROLL)
+    tx_hash = None
     if payout - TOKENS_TO_ROLL > 0:
         tx_hash = send_token(CONTRACT_ADDRESS, wallet_address, payout - TOKENS_TO_ROLL)
         # threading.Thread(target=send_prize, args=(wallet_address, payout), daemon=True).start()
@@ -185,6 +186,10 @@ def roll(message):
     else:
         tx_hash = send_token(wallet_address, CONTRACT_ADDRESS, TOKENS_TO_ROLL - payout)
         bot.reply_to(message, "No payout this time. Better luck next roll!")
+
+    tx_receipt = get_tx_receipt(tx_hash)
+    if tx_receipt['status'] != 1:
+        bot.reply_to(message, "!!! alarm, previous transaction failed !!!")
     remove_user(wallet_address)
 
 
@@ -194,7 +199,7 @@ def withdraw(message):
     if not user or not wallet_address:
         return
     if not add_user(wallet_address):
-        bot.reply_to(message, "Please do not hurry")
+        bot.reply_to(message, "Please do not hurry, previous transaction is running...")
         return
 
     args = message.text.split()
