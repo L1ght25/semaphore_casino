@@ -1,22 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-contract SemaphoreToken is IERC20 {
-    // События для ERC20
-    // event Transfer(address indexed from, address indexed to, uint256 value);
-    // event Approval(address indexed owner, address indexed spender, uint256 value);
+import {Script, console} from "forge-std/Script.sol";
 
-    // Дополнительные события
-    event Received(address indexed sender, uint256 amount);
-    event TokensPurchased(address indexed purchaser, uint256 amount);
-    event TokensExchanged(address indexed exchanger, uint256 ethAmount);
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/presets/ERC20PresetMinterPauser.sol";
 
-    address public owner;
-    uint256 public exchangeRate; // Количество SemaphoreToken за 1 ETH
 
+// Балансы и по сути сам токен тут только тссс...))
+// Отдельный контракт, чтобы можно было обновлять контракт, но сохранять балансы
+contract Mappings is IERC20 {
     mapping(address => uint256) private balances;
     mapping(address => mapping(address => uint256)) private allowances;
 
+    address public owner; // = Actual SemaphoreToken contract
     uint256 private totalSupply_;
 
     modifier onlyOwner() {
@@ -24,11 +21,15 @@ contract SemaphoreToken is IERC20 {
         _;
     }
 
-    constructor(uint256 _exchangeRate, uint256 initialSupply) {
+    constructor(uint256 initialSupply) {
         owner = msg.sender;
-        exchangeRate = _exchangeRate;
         totalSupply_ = initialSupply;
         balances[owner] = initialSupply;
+    }
+
+    function changeOwner(address newOwner) public onlyOwner {
+        transfer(newOwner, balanceOf(owner));
+        owner = newOwner;
     }
 
     function name() public pure returns (string memory) {
@@ -109,11 +110,43 @@ contract SemaphoreToken is IERC20 {
         allowances[_owner][spender] = amount;
         emit Approval(_owner, spender, amount);
     }
+}
+
+// Правила обмена эфира на токены и наоборот + управление балансами происходит черег этот контракт
+contract SemaphoreToken {
+    // Дополнительные события
+    event Received(address indexed sender, uint256 amount);
+    event TokensPurchased(address indexed purchaser, uint256 amount);
+    event TokensExchanged(address indexed exchanger, uint256 ethAmount);
+
+    address public owner;
+    uint256 public exchangeRate; // Количество wei за 1 SemaphoreToken
+
+    Mappings balances;
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this function");
+        _;
+    }
+
+    constructor(uint256 _exchangeRate, address mappingsAddress) {
+        owner = msg.sender;
+        exchangeRate = _exchangeRate;
+        balances = Mappings(mappingsAddress);
+    }
+
+    function balanceOf(address account) public view returns (uint256) {
+        return balances.balanceOf(account);
+    }
+
+    function privilegedTransfer(address from, address to, uint256 amount) public onlyOwner {
+        balances.privilegedTransfer(from, to, amount);
+    }
 
     receive() external payable {
         uint256 tokenAmount = msg.value / exchangeRate;
-        _mint(msg.sender, tokenAmount);
-        
+        balances.privilegedTransfer(owner, msg.sender, tokenAmount);
+
         emit Received(msg.sender, msg.value);
         emit TokensPurchased(msg.sender, tokenAmount);
     }
@@ -123,13 +156,32 @@ contract SemaphoreToken is IERC20 {
     }
 
     function exchangeTokens(uint256 tokenAmount, address payable recipient) public {
-        require(balances[msg.sender] >= tokenAmount, "Insufficient tokens to exchange");
+        require(balances.balanceOf(msg.sender) >= tokenAmount, "Insufficient tokens to exchange");
         uint256 etherAmount = tokenAmount * exchangeRate;
         require(address(this).balance >= etherAmount, "Contract has insufficient Ether");
 
-        _burn(msg.sender, tokenAmount);
+        balances.privilegedTransfer(msg.sender, owner, tokenAmount);
         recipient.transfer(etherAmount);
 
         emit TokensExchanged(msg.sender, etherAmount);
+    }
+}
+
+contract Deploy is Script {
+    function setUp() public {}
+
+    function run() public {
+        uint pk = vm.envUint("PRIVATE_KEY");
+        address me = vm.addr(pk);
+
+        vm.startBroadcast(pk);
+
+        Mappings map = new Mappings(1e20);
+        // SemaphoreToken st = new SemaphoreToken(5e15, address(map));
+
+        console.log(address(map));
+        // console.log(address(st));
+
+        vm.stopBroadcast();
     }
 }

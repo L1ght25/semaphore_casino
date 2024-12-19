@@ -9,6 +9,7 @@ CONTRACT_ADDRESS = os.getenv("CONTRACT_ADDRESS")  # Replace with your deployed c
 PRIVATE_KEY = os.getenv("BOT_PRIVATE_KEY")  # Replace with your bot's wallet private key
 BOT_ADDRESS = Web3.to_checksum_address(os.getenv("BOT_WALLET_ADDRESS"))  # Replace with your bot's wallet address
 TOKEN_ADDRESS = CONTRACT_ADDRESS  # Replace with your CasinoToken contract address
+MAPPINGS_ADDRESS = os.getenv("MAPPINGS_ADDRESS")
 
 TOKENS_TO_ROLL = 10
 
@@ -30,6 +31,13 @@ bot = telebot.TeleBot(os.getenv("TELEGRAM_BOT_TOKEN"))
 
 # Dictionary to store Telegram username -> wallet address mapping
 user_wallets = {}
+with open("users.json", "r") as users_file:
+    user_wallets = json.load(users_file)
+
+def dump_users(addresses):
+    with open("users.json", "w") as users_file:
+        json.dump(addresses, users_file, indent=4)
+
 
 dice_coefs = [0, 0.3, 0.5, 1, 1.6, 2]
 
@@ -52,6 +60,7 @@ def register(message):
         return
 
     user_wallets[user.username] = wallet_address
+    dump_users(user_wallets)
     bot.reply_to(message, f"{user.first_name}, your wallet address {wallet_address} has been registered!")
     bot.reply_to(message, f"Send ETH (0.005 ETH = 1 SMPH, 10 SMPTH = 1 roll) to the following address to start playing: {CONTRACT_ADDRESS}")
 
