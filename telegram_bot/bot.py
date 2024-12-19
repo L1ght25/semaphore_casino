@@ -114,7 +114,7 @@ def roll(message):
         return
 
     tx_hash = send_token(wallet_address, CONTRACT_ADDRESS, TOKENS_TO_ROLL)
-    bot.reply_to(message, f"Transaction for wei sent! [tx](https://sepolia.etherscan.io/tx/0x{tx_hash.hex()})", disable_web_page_preview=True)
+    bot.reply_to(message, f"Transaction for wei sent! [tx](https://sepolia.etherscan.io/tx/0x{tx_hash.hex()})", disable_web_page_preview=True, parse_mode="markdown")
 
     tx_receipt = get_tx_receipt(tx_hash)
 
@@ -165,8 +165,11 @@ def login(message):
 def get_tx_receipt(tx_hash):
     transaction_receipt = None
     while transaction_receipt is None:
-        transaction_receipt = web3.eth.get_transaction_receipt(tx_hash)
-        time.sleep(1)
+        try:
+            transaction_receipt = web3.eth.get_transaction_receipt(tx_hash)
+        except:
+            pass
+        time.sleep(0.3)
     return transaction_receipt
 
 def send_token(sender, receiver, amount):
