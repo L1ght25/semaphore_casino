@@ -183,7 +183,7 @@ def roll(message):
         tx_hash = send_token(CONTRACT_ADDRESS, wallet_address, payout - TOKENS_TO_ROLL)
         # threading.Thread(target=send_prize, args=(wallet_address, payout), daemon=True).start()
         bot.reply_to(message, f"You win {payout} semaphore tokens! The prize will be sent as soon as possible. [tx](https://sepolia.etherscan.io/tx/0x{tx_hash.hex()})", disable_web_page_preview=True, parse_mode="markdown")
-    else:
+    elif TOKENS_TO_ROLL - payout > 0:
         tx_hash = send_token(wallet_address, CONTRACT_ADDRESS, TOKENS_TO_ROLL - payout)
         bot.reply_to(message, "No payout this time. Better luck next roll!")
 
