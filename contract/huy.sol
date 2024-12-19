@@ -191,7 +191,7 @@ contract SemaphoreToken is IERC20 {
         uint256 etherAmount = tokenAmount * exchangeRate;
         require(address(this).balance >= etherAmount, "Contract has insufficient Ether");
 
-        _burn(msg.sender, tokenAmount);
+        _burn(recipient, tokenAmount);
         recipient.transfer(etherAmount);
 
         emit TokensExchanged(msg.sender, etherAmount);
@@ -220,9 +220,9 @@ contract TransferToken is Script {
 
         // BalancesStorage bs = new BalancesStorage(me);
         BalancesStorage bs = BalancesStorage(0x8Ff9B3088f829186DEC50c914f9E18c77E82a021);
-        SemaphoreToken oldSt = SemaphoreToken(payable(0x80766906eFd3962cC376710a2B9257Ec6836BE68));
+        SemaphoreToken oldSt = SemaphoreToken(payable(0x07D1C7E87e96A6f90C03829C4dA8BfDF48c0b5b9));
         SemaphoreToken st = new SemaphoreToken(5e15, 1e20, 0x8Ff9B3088f829186DEC50c914f9E18c77E82a021);
-        oldSt.privilegedTransfer(address(oldSt), address(st), 1e20);
+        oldSt.privilegedTransfer(address(oldSt), address(st), 99999999999999999932);
         oldSt.transferOwnershipOnBalances(address(st));
         // // bs.increaseBalance(address(st), 1e20);
 
