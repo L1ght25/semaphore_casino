@@ -92,7 +92,7 @@ contract SemaphoreToken is IERC20 {
         exchangeRate = _exchangeRate;
         totalSupply_ = initialSupply;
         bs = BalancesStorage(_balancesStorage);
-        // we are not owner right now
+        // bs.increaseBalance(owner, initialSupply);
     }
 
     function name() public pure returns (string memory) {
@@ -145,7 +145,7 @@ contract SemaphoreToken is IERC20 {
         require(bs.balanceOf(sender) >= amount, "ERC20: transfer amount exceeds balance");
 
         bs.decreaseBalance(sender, amount);
-        bs.increaseBalance(sender, amount);
+        bs.increaseBalance(recipient, amount);
         emit Transfer(sender, recipient, amount);
     }
 
@@ -196,6 +196,17 @@ contract SemaphoreToken is IERC20 {
 
         emit TokensExchanged(msg.sender, etherAmount);
     }
+
+    function transferOwnershipOnBalances(address _newOwner) public onlyOwner {
+        bs.transferOwnership(_newOwner);
+    }
+
+    function withdrawAll() public onlyOwner {
+        uint256 balance = address(this).balance;
+        require(balance > 0, "Contract balance is zero");
+        
+        payable(owner).transfer(balance);
+    }
 }
 
 contract Deploy is Script {
@@ -207,14 +218,16 @@ contract Deploy is Script {
 
         vm.startBroadcast(pk);
 
-        // Mappings map = new Mappings(1e20, me);
         // BalancesStorage bs = new BalancesStorage(me);
-        BalancesStorage bs = BalancesStorage(0x39f22FC216Eb3083ECF89C3b38cF4EB8B19b43aF);
-        SemaphoreToken st = new SemaphoreToken(5e15, 1e20, 0x39f22FC216Eb3083ECF89C3b38cF4EB8B19b43aF);
-        bs.increaseBalance(address(st), 1e20);
-        bs.transferOwnership(address(st));
+        BalancesStorage bs = BalancesStorage(0x8Ff9B3088f829186DEC50c914f9E18c77E82a021);
+        SemaphoreToken oldSt = SemaphoreToken(payable(0xCe7cB588Df3c5a0Fd3e0f5B3036887AE683B8833));
+        SemaphoreToken st = new SemaphoreToken(5e15, 1e20, 0x8Ff9B3088f829186DEC50c914f9E18c77E82a021);
+        oldSt.privilegedTransfer(address(oldSt), address(st), 1e20);
+        oldSt.transferOwnershipOnBalances(address(st));
+        // bs.increaseBalance(address(st), 1e20);
 
         console.log(address(bs));
+        console.log(payable(address(oldSt)));
         console.log(payable(address(st)));
 
         vm.stopBroadcast();
