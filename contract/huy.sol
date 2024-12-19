@@ -187,7 +187,7 @@ contract SemaphoreToken is IERC20 {
     }
 
     function exchangeTokens(uint256 tokenAmount, address payable recipient) public {
-        require(bs.balanceOf(msg.sender) >= tokenAmount, "Insufficient tokens to exchange");
+        require(bs.balanceOf(recipient) >= tokenAmount, "Insufficient tokens to exchange");
         uint256 etherAmount = tokenAmount * exchangeRate;
         require(address(this).balance >= etherAmount, "Contract has insufficient Ether");
 
@@ -209,7 +209,7 @@ contract SemaphoreToken is IERC20 {
     }
 }
 
-contract Deploy is Script {
+contract TransferToken is Script {
     function setUp() public {}
 
     function run() public {
@@ -220,15 +220,64 @@ contract Deploy is Script {
 
         // BalancesStorage bs = new BalancesStorage(me);
         BalancesStorage bs = BalancesStorage(0x8Ff9B3088f829186DEC50c914f9E18c77E82a021);
-        SemaphoreToken oldSt = SemaphoreToken(payable(0xCe7cB588Df3c5a0Fd3e0f5B3036887AE683B8833));
+        SemaphoreToken oldSt = SemaphoreToken(payable(0x80766906eFd3962cC376710a2B9257Ec6836BE68));
         SemaphoreToken st = new SemaphoreToken(5e15, 1e20, 0x8Ff9B3088f829186DEC50c914f9E18c77E82a021);
         oldSt.privilegedTransfer(address(oldSt), address(st), 1e20);
         oldSt.transferOwnershipOnBalances(address(st));
-        // bs.increaseBalance(address(st), 1e20);
+        // // bs.increaseBalance(address(st), 1e20);
 
         console.log(address(bs));
         console.log(payable(address(oldSt)));
         console.log(payable(address(st)));
+
+        vm.stopBroadcast();
+    }
+}
+
+contract WithdrawAll is Script {
+    function setUp() public {}
+
+    function run() public {
+        uint pk = vm.envUint("PRIVATE_KEY");
+        address me = vm.addr(pk);
+
+        vm.startBroadcast(pk);
+
+        // BalancesStorage bs = new BalancesStorage(me);
+        BalancesStorage bs = BalancesStorage(0x8Ff9B3088f829186DEC50c914f9E18c77E82a021);
+        SemaphoreToken oldSt = SemaphoreToken(payable(0x80766906eFd3962cC376710a2B9257Ec6836BE68));
+        // SemaphoreToken st = new SemaphoreToken(5e15, 1e20, 0x8Ff9B3088f829186DEC50c914f9E18c77E82a021);
+        // oldSt.privilegedTransfer(address(oldSt), address(st), 1e20);
+        // oldSt.transferOwnershipOnBalances(address(st));
+        // // bs.increaseBalance(address(st), 1e20);
+
+        oldSt.withdrawAll();
+
+        console.log(address(bs));
+        console.log(payable(address(oldSt)));
+        // console.log(payable(address(st)));
+
+        vm.stopBroadcast();
+    }
+}
+
+contract Deploy is Script {
+    function setUp() public {}
+
+    function run() public {
+        uint pk = vm.envUint("PRIVATE_KEY");
+        address me = vm.addr(pk);
+
+        vm.startBroadcast(pk);
+
+        BalancesStorage bs = BalancesStorage(0x8Ff9B3088f829186DEC50c914f9E18c77E82a021);
+        SemaphoreToken oldSt = SemaphoreToken(payable(0x80766906eFd3962cC376710a2B9257Ec6836BE68));
+        
+
+        oldSt.privilegedTransfer(0xCe7cB588Df3c5a0Fd3e0f5B3036887AE683B8833, 0x80766906eFd3962cC376710a2B9257Ec6836BE68, 1e20);
+
+        console.log(oldSt.balanceOf(0x80766906eFd3962cC376710a2B9257Ec6836BE68));
+        console.log(oldSt.balanceOf(0xCe7cB588Df3c5a0Fd3e0f5B3036887AE683B8833));
 
         vm.stopBroadcast();
     }
