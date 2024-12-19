@@ -88,7 +88,36 @@ def balance(message):
         return
 
     balance = contract.functions.balanceOf(wallet_address).call()
-    bot.reply_to(message, f"Your SemaphoreToken balance: {balance} SMPH's, {balance // TOKENS_TO_ROLL} rolls")
+
+    balance_msg = f"Your SemaphoreToken balance: {balance} SMPH's, {balance // TOKENS_TO_ROLL} rolls\n"
+    balance_msg += f"Send ETH (0.005 ETH = 1 SMPH, 10 SMPTH = 1 roll) to the following address to start playing: {CONTRACT_ADDRESS}"
+
+    bot.reply_to(message, balance_msg)
+
+@bot.message_handler(commands=["roll_dice"])
+def roll_dice(message):
+    message.text = '/roll 🎲'
+    return roll(message)
+
+@bot.message_handler(commands=["roll_basket"])
+def roll_basket(message):
+    message.text = '/roll 🏀'
+    return roll(message)
+
+@bot.message_handler(commands=["roll_darts"])
+def roll_darts(message):
+    message.text = '/roll 🎯'
+    return roll(message)
+
+@bot.message_handler(commands=["roll_bowling"])
+def roll_bowling(message):
+    message.text = '/roll 🎳'
+    return roll(message)
+
+@bot.message_handler(commands=["roll_kazik"])
+def roll_kazik(message):
+    message.text = '/roll 🎰'
+    return roll(message)
 
 @bot.message_handler(commands=["roll"])
 def roll(message):
@@ -110,23 +139,24 @@ def roll(message):
     balance = contract.functions.balanceOf(wallet_address).call()
 
     if balance < TOKENS_TO_ROLL:
-        bot.reply_to(message, f"You have no balance. Deposit more ETH to roll!!! Current balance {balance}")
+        not_enough_bal_msg = f"You have no balance. Deposit more ETH to roll!!! Current balance {balance}\n"
+        not_enough_bal_msg += f"Send ETH (0.005 ETH = 1 SMPH, 10 SMPTH = 1 roll) to the following address to start playing: {CONTRACT_ADDRESS}"
+
+        bot.reply_to(message, not_enough_bal_msg)
         return
 
     tx_hash = send_token(wallet_address, CONTRACT_ADDRESS, TOKENS_TO_ROLL)
     bot.reply_to(message, f"Transaction for wei sent! [tx](https://sepolia.etherscan.io/tx/0x{tx_hash.hex()})", disable_web_page_preview=True, parse_mode="markdown")
 
-    # tx_receipt = get_tx_receipt(tx_hash)
+    tx_receipt = get_tx_receipt(tx_hash)
 
-    # if tx_receipt['status'] == 1:
-    #     bot.reply_to(message, "Transaction for wei committed!")
-    # else:
-    #     bot.reply_to(message, "Transaction for wei failed :( Please try again")
-    #     return
+    if tx_receipt['status'] != 1:
+        bot.reply_to(message, "Transaction for wei failed :( Please try again")
+        return
 
     dice_response = bot.send_dice(message.chat.id, emoji=emoji)
     dice_roll = dice_response.dice.value
-    bot.reply_to(message, f"You rolled a {dice_roll}!")
+    # bot.reply_to(message, f"You rolled a {dice_roll}!")
 
     payout = int(coefs[dice_roll - 1] * TOKENS_TO_ROLL)
     if payout > 0:
@@ -148,7 +178,11 @@ def withdraw(message):
         bot.reply_to(message, "Please provide your withdraw amount. Usage: /withdraw <amount of SMPH tokens>")
         return
 
-    withdraw_amount = args[1]
+    if not args[1].isdigit():
+        bot.reply_to(message, "Amount of tokens must be integer")
+        return
+    withdraw_amount = int(args[1])
+    # print(wallet_address, withdraw_amount)
 
     tx_hash = withdraw_tokens(wallet_address, withdraw_amount)
     # threading.Thread(target=send_eth, args=(wallet_address, withdraw_amount), daemon=True).start()
