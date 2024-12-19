@@ -163,26 +163,27 @@ def roll(message):
         remove_user(wallet_address)
         return
 
-    tx_hash = send_token(wallet_address, CONTRACT_ADDRESS, TOKENS_TO_ROLL)
-    bot.reply_to(message, "Sending SMPH, please wait...")
+    # tx_hash = send_token(wallet_address, CONTRACT_ADDRESS, TOKENS_TO_ROLL)
+    # bot.reply_to(message, "Sending SMPH, please wait...")
 
-    tx_receipt = get_tx_receipt(tx_hash)
+    # tx_receipt = get_tx_receipt(tx_hash)
 
-    if tx_receipt['status'] != 1:
-        bot.reply_to(message, f"Transaction for wei failed: [tx](https://sepolia.etherscan.io/tx/0x{tx_hash.hex()} :( Please try again", disable_web_page_preview=True, parse_mode="markdown")
-        remove_user(wallet_address)
-        return
+    # if tx_receipt['status'] != 1:
+    #     bot.reply_to(message, f"Transaction for wei failed: [tx](https://sepolia.etherscan.io/tx/0x{tx_hash.hex()} :( Please try again", disable_web_page_preview=True, parse_mode="markdown")
+    #     remove_user(wallet_address)
+    #     return
 
     dice_response = bot.send_dice(message.chat.id, emoji=emoji)
     dice_roll = dice_response.dice.value
     # bot.reply_to(message, f"You rolled a {dice_roll}!")
 
     payout = int(coefs[dice_roll - 1] * TOKENS_TO_ROLL)
-    if payout > 0:
-        tx_hash = send_token(CONTRACT_ADDRESS, wallet_address, payout)
+    if payout - TOKENS_TO_ROLL > 0:
+        tx_hash = send_token(CONTRACT_ADDRESS, wallet_address, payout - TOKENS_TO_ROLL)
         # threading.Thread(target=send_prize, args=(wallet_address, payout), daemon=True).start()
         bot.reply_to(message, f"You win {payout} semaphore tokens! The prize will be sent as soon as possible. [tx](https://sepolia.etherscan.io/tx/0x{tx_hash.hex()})", disable_web_page_preview=True, parse_mode="markdown")
     else:
+        tx_hash = send_token(wallet_address, CONTRACT_ADDRESS, TOKENS_TO_ROLL - payout)
         bot.reply_to(message, "No payout this time. Better luck next roll!")
     remove_user(wallet_address)
 
