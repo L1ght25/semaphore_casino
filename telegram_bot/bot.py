@@ -33,7 +33,13 @@ bot = telebot.TeleBot(os.getenv("TELEGRAM_BOT_TOKEN"))
 # Dictionary to store Telegram username -> wallet address mapping
 user_wallets = {}
 
-dice_coefs = [0, 0.3, 0.5, 1, 1.6, 2]
+dice_coefs = {
+    '🎲': [0, 0.3, 0.5, 1, 1.6, 2],
+    '🏀': [0, 0, 0, 0, 0],
+    '🎯': [0, 0, 0, 0, 0, 0],
+    '🎳': [0, 0, 0, 0, 0, 0],
+    '🎰': [0 for i in range(64)]
+}
 
 @bot.message_handler(commands=["start"])
 def start(message):
@@ -75,6 +81,17 @@ def roll(message):
     if not user or not wallet_address:
         return
 
+    args = message.text.split()
+    if len(args) != 2:
+        bot.reply_to(message, "Please provide casino type as an emoji. Examples: 🎲, 🏀")
+        return
+
+    emoji = args[1]
+    if emoji not in dice_coefs:
+        bot.reply_to(message, f"Unsupportable emoji provided. Avalable emojies: {', '.join(dice_coefs.keys())}")
+        return
+    coefs = dice_coefs[emoji]
+
     balance = contract.functions.balanceOf(wallet_address).call()
 
     if balance < TOKENS_TO_ROLL:
@@ -92,11 +109,11 @@ def roll(message):
         bot.reply_to(message, "Transaction for wei failed :( Please try again")
         return
 
-    dice_response = bot.send_dice(message.chat.id, emoji="🎲")
+    dice_response = bot.send_dice(message.chat.id, emoji=emoji)
     dice_roll = dice_response.dice.value
     bot.reply_to(message, f"You rolled a {dice_roll}!")
 
-    payout = int(dice_coefs[dice_roll - 1] * TOKENS_TO_ROLL)
+    payout = int(coefs[dice_roll - 1] * TOKENS_TO_ROLL)
     if payout > 0:
         threading.Thread(target=send_prize, args=(wallet_address, payout), daemon=True).start()
         bot.reply_to(message, f"You win {payout} semaphore tokens! The prize will be sent as soon as possible")
