@@ -43,11 +43,17 @@ def dump_users(addresses):
 
 dice_coefs = {
     '🎲': [0, 0.3, 0.5, 1, 1.6, 2],
-    '🏀': [0, 0, 0, 0, 0],
-    '🎯': [0, 0, 0, 0, 0, 0],
-    '🎳': [0, 0, 0, 0, 0, 0],
+    '🏀': [0, 0, 0.5, 2, 2],
+    '🎯': [0, 0.1, 0.3, 0.5, 1.5, 3],
+    '🎳': [0, 0.1, 0.3, 1, 1.5, 2.5],
     '🎰': [0 for i in range(64)]
 }
+
+dice_coefs['🎰'][0] = 9 # bar x3
+dice_coefs['🎰'][63] = 30 # 777
+dice_coefs['🎰'][21] = 9 # grape x3
+dice_coefs['🎰'][42] = 9 # lemon x3
+
 
 @bot.message_handler(commands=["start"])
 def start(message):
