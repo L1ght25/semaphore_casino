@@ -71,6 +71,10 @@ contract SemaphoreToken is IERC20 {
         return true;
     }
 
+    function privilegedTransfer(address from, address to, uint256 amount) public onlyOwner {
+        _transfer(from, to, amount);
+    }
+
     function _transfer(address sender, address recipient, uint256 amount) internal {
         require(sender != address(0), "ERC20: transfer from the zero address");
         require(recipient != address(0), "ERC20: transfer to the zero address");
@@ -107,7 +111,7 @@ contract SemaphoreToken is IERC20 {
     }
 
     receive() external payable {
-        uint256 tokenAmount = msg.value * exchangeRate;
+        uint256 tokenAmount = msg.value / exchangeRate;
         _mint(msg.sender, tokenAmount);
         
         emit Received(msg.sender, msg.value);
@@ -120,7 +124,7 @@ contract SemaphoreToken is IERC20 {
 
     function exchangeTokens(uint256 tokenAmount, address payable recipient) public {
         require(balances[msg.sender] >= tokenAmount, "Insufficient tokens to exchange");
-        uint256 etherAmount = tokenAmount / exchangeRate;
+        uint256 etherAmount = tokenAmount * exchangeRate;
         require(address(this).balance >= etherAmount, "Contract has insufficient Ether");
 
         _burn(msg.sender, tokenAmount);
