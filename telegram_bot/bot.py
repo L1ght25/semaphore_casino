@@ -184,6 +184,12 @@ def withdraw(message):
     withdraw_amount = int(args[1])
     # print(wallet_address, withdraw_amount)
 
+    balance = contract.functions.balanceOf(wallet_address).call()
+    if balance < withdraw_amount:
+        not_enough_bal_msg = f"You don't have enough money to withdraw {withdraw_amount}.\n Current balance: {balance}\n"
+        bot.reply_to(message, not_enough_bal_msg)
+        return
+
     tx_hash = withdraw_tokens(wallet_address, withdraw_amount)
     # threading.Thread(target=send_eth, args=(wallet_address, withdraw_amount), daemon=True).start()
     bot.reply_to(message, f"Withdraw success! The ETH will be sent as soon as possible. [tx](https://sepolia.etherscan.io/tx/0x{tx_hash.hex()})", disable_web_page_preview=True, parse_mode="markdown")
