@@ -9,7 +9,7 @@ CONTRACT_ADDRESS = os.getenv("CONTRACT_ADDRESS")  # Replace with your deployed c
 PRIVATE_KEY = os.getenv("BOT_PRIVATE_KEY")  # Replace with your bot's wallet private key
 BOT_ADDRESS = Web3.to_checksum_address(os.getenv("BOT_WALLET_ADDRESS"))  # Replace with your bot's wallet address
 TOKEN_ADDRESS = CONTRACT_ADDRESS  # Replace with your CasinoToken contract address
-MAPPINGS_ADDRESS = os.getenv("MAPPINGS_ADDRESS")
+BALANCE_STORAGE = os.getenv("BALANCE_STORAGE")
 
 TOKENS_TO_ROLL = 10
 
