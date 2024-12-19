@@ -146,12 +146,12 @@ def roll(message):
         return
 
     tx_hash = send_token(wallet_address, CONTRACT_ADDRESS, TOKENS_TO_ROLL)
-    bot.reply_to(message, f"Transaction for wei sent! [tx](https://sepolia.etherscan.io/tx/0x{tx_hash.hex()})", disable_web_page_preview=True, parse_mode="markdown")
+    bot.reply_to(message, "Sending SMPH, please wait...")
 
     tx_receipt = get_tx_receipt(tx_hash)
 
     if tx_receipt['status'] != 1:
-        bot.reply_to(message, "Transaction for wei failed :( Please try again")
+        bot.reply_to(message, f"Transaction for wei failed: [tx](https://sepolia.etherscan.io/tx/0x{tx_hash.hex()} :( Please try again", disable_web_page_preview=True, parse_mode="markdown")
         return
 
     dice_response = bot.send_dice(message.chat.id, emoji=emoji)
