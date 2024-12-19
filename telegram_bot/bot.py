@@ -116,13 +116,13 @@ def roll(message):
     tx_hash = send_token(wallet_address, CONTRACT_ADDRESS, TOKENS_TO_ROLL)
     bot.reply_to(message, f"Transaction for wei sent! [tx](https://sepolia.etherscan.io/tx/0x{tx_hash.hex()})", disable_web_page_preview=True, parse_mode="markdown")
 
-    tx_receipt = get_tx_receipt(tx_hash)
+    # tx_receipt = get_tx_receipt(tx_hash)
 
-    if tx_receipt['status'] == 1:
-        bot.reply_to(message, "Transaction for wei committed!")
-    else:
-        bot.reply_to(message, "Transaction for wei failed :( Please try again")
-        return
+    # if tx_receipt['status'] == 1:
+    #     bot.reply_to(message, "Transaction for wei committed!")
+    # else:
+    #     bot.reply_to(message, "Transaction for wei failed :( Please try again")
+    #     return
 
     dice_response = bot.send_dice(message.chat.id, emoji=emoji)
     dice_roll = dice_response.dice.value
@@ -130,8 +130,9 @@ def roll(message):
 
     payout = int(coefs[dice_roll - 1] * TOKENS_TO_ROLL)
     if payout > 0:
-        threading.Thread(target=send_prize, args=(wallet_address, payout), daemon=True).start()
-        bot.reply_to(message, f"You win {payout} semaphore tokens! The prize will be sent as soon as possible")
+        tx_hash = send_token(CONTRACT_ADDRESS, wallet_address, payout)
+        # threading.Thread(target=send_prize, args=(wallet_address, payout), daemon=True).start()
+        bot.reply_to(message, f"You win {payout} semaphore tokens! The prize will be sent as soon as possible. [tx](https://sepolia.etherscan.io/tx/0x{tx_hash.hex()})", disable_web_page_preview=True, parse_mode="markdown")
     else:
         bot.reply_to(message, "No payout this time. Better luck next roll!")
 
@@ -149,8 +150,9 @@ def withdraw(message):
 
     withdraw_amount = args[1]
 
-    threading.Thread(target=send_eth, args=(wallet_address, withdraw_amount), daemon=True).start()
-    bot.reply_to(message, f"Withdraw success! The ETH will be sent as soon as possible")
+    tx_hash = withdraw_tokens(wallet_address, withdraw_amount)
+    # threading.Thread(target=send_eth, args=(wallet_address, withdraw_amount), daemon=True).start()
+    bot.reply_to(message, f"Withdraw success! The ETH will be sent as soon as possible. [tx](https://sepolia.etherscan.io/tx/0x{tx_hash.hex()})", disable_web_page_preview=True, parse_mode="markdown")
 
 def login(message):
     user = message.from_user
@@ -169,7 +171,7 @@ def get_tx_receipt(tx_hash):
             transaction_receipt = web3.eth.get_transaction_receipt(tx_hash)
         except:
             pass
-        time.sleep(0.3)
+        time.sleep(0.1)
     return transaction_receipt
 
 def send_token(sender, receiver, amount):
