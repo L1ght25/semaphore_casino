@@ -2,6 +2,8 @@ import telebot
 from web3 import Web3
 import json
 import os
+import time
+import threading
 
 # Ethereum Configuration
 ETH_NODE_URL = os.getenv("ETH_NODE_URL")  # Replace with your Ethereum node URL
@@ -52,28 +54,25 @@ def register(message):
         return
 
     user_wallets[user.username] = wallet_address
-    bot.reply_to(message, f"{user.first_name}, your wallet address {wallet_address} has been registered!")
-    bot.reply_to(message, f"Send ETH (0.005 ETH = 1 SMPH, 10 SMPTH = 1 roll) to the following address to start playing: {CONTRACT_ADDRESS}")
+
+    registered_msg = f"{user.first_name}, your wallet address {wallet_address} has been registered!\n"
+    registered_msg += f"Send ETH (0.005 ETH = 1 SMPH, 10 SMPTH = 1 roll) to the following address to start playing: {CONTRACT_ADDRESS}"
+
+    bot.reply_to(message, registered_msg)
 
 @bot.message_handler(commands=["balance"])
 def balance(message):
-    user = message.from_user
-    wallet_address = user_wallets.get(user.username)
-
-    if not wallet_address:
-        bot.reply_to(message, "You have not registered your wallet address. Use /register <your_wallet_address> to register.")
+    user, wallet_address = login(message)
+    if not user or not wallet_address:
         return
 
     balance = contract.functions.balanceOf(wallet_address).call()
-    bot.reply_to(message, f"Your SemaphoreToken balance: {balance} SMPH's, {balance // 10} rolls")
+    bot.reply_to(message, f"Your SemaphoreToken balance: {balance} SMPH's, {balance // TOKENS_TO_ROLL} rolls")
 
 @bot.message_handler(commands=["roll"])
 def roll(message):
-    user = message.from_user
-    wallet_address = user_wallets.get(user.username)
-
-    if not wallet_address:
-        bot.reply_to(message, "You have not registered your wallet address. Use /register <your_wallet_address> to register.")
+    user, wallet_address = login(message)
+    if not user or not wallet_address:
         return
 
     balance = contract.functions.balanceOf(wallet_address).call()
@@ -83,7 +82,15 @@ def roll(message):
         return
 
     tx_hash = send_token(wallet_address, CONTRACT_ADDRESS, TOKENS_TO_ROLL)
-    bot.reply_to(message, f"Transaction for wei sent! [tx](https://sepolia.etherscan.io/tx/0x{tx_hash.hex()})")
+    bot.reply_to(message, f"Transaction for wei sent! [tx](https://sepolia.etherscan.io/tx/0x{tx_hash.hex()})", disable_web_page_preview=True)
+
+    tx_receipt = get_tx_receipt(tx_hash)
+
+    if tx_receipt['status'] == 1:
+        bot.reply_to(message, "Transaction for wei committed!")
+    else:
+        bot.reply_to(message, "Transaction for wei failed :( Please try again")
+        return
 
     dice_response = bot.send_dice(message.chat.id, emoji="🎲")
     dice_roll = dice_response.dice.value
@@ -91,30 +98,44 @@ def roll(message):
 
     payout = int(dice_coefs[dice_roll - 1] * TOKENS_TO_ROLL)
     if payout > 0:
-        tx_hash = send_token(CONTRACT_ADDRESS, wallet_address, payout)
-        bot.reply_to(message, f"You win {payout} semaphore tokens! [tx](https://sepolia.etherscan.io/tx/0x{tx_hash.hex()})")
+        threading.Thread(target=send_prize, args=(wallet_address, payout), daemon=True).start()
+        bot.reply_to(message, f"You win {payout} semaphore tokens! The prize will be sent as soon as possible")
     else:
         bot.reply_to(message, "No payout this time. Better luck next roll!")
 
 @bot.message_handler(commands=["withdraw"])
 def withdraw(message):
-    user = message.from_user
-    args = message.text.split()
-
-    wallet_address = user_wallets.get(user.username)
-
-    if not wallet_address:
-        bot.reply_to(message, "You have not registered your wallet address. Use /register <your_wallet_address> to register.")
+    user, wallet_address = login(message)
+    if not user or not wallet_address:
         return
+
+    args = message.text.split()
 
     if len(args) != 2:
         bot.reply_to(message, "Please provide your withdraw amount. Usage: /withdraw <amount of SMPH tokens>")
         return
 
     withdraw_amount = args[1]
-    tx_hash = withdraw_tokens(wallet_address, withdraw_amount)
-    bot.reply_to(message, f"Withdraw success! [tx](https://sepolia.etherscan.io/tx/0x{tx_hash.hex()})")
 
+    threading.Thread(target=send_eth, args=(wallet_address, withdraw_amount), daemon=True).start()
+    bot.reply_to(message, f"Withdraw success! The ETH will be sent as soon as possible")
+
+def login(message):
+    user = message.from_user
+    wallet_address = user_wallets.get(user.username)
+
+    if not wallet_address:
+        bot.reply_to(message, "You have not registered your wallet address. Use /register <your_wallet_address> to register.")
+        return None, None
+
+    return user, wallet_address
+
+def get_tx_receipt(tx_hash):
+    transaction_receipt = None
+    while transaction_receipt is None:
+        transaction_receipt = web3.eth.get_transaction_receipt(tx_hash)
+        time.sleep(1)
+    return transaction_receipt
 
 def send_token(sender, receiver, amount):
     global nonce
@@ -144,5 +165,18 @@ def withdraw_tokens(receiver, amount):
 
     return tx_hash
 
+def send_prize(wallet_address, payout):
+    was_sent = False
+    while not was_sent:
+        tx_hash = send_token(CONTRACT_ADDRESS, wallet_address, payout)
+        tx_receipt = get_tx_receipt(tx_hash)
+        was_sent = tx_receipt['status'] == 1
+
+def send_eth(wallet_address, withdraw_amount):
+    was_sent = False
+    while not was_sent:
+        tx_hash = withdraw_tokens(wallet_address, withdraw_amount)
+        tx_receipt = get_tx_receipt(tx_hash)
+        was_sent = tx_receipt['status'] == 1
 
 bot.polling()
