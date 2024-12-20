@@ -1,9 +1,12 @@
 import telebot
 from web3 import Web3
+from eth_account.messages import encode_defunct
 import json
 import os
 import time
 import threading
+import random
+import string
 
 # Ethereum Configuration
 ETH_NODE_URL = os.getenv("ETH_NODE_URL")  # Replace with your Ethereum node URL
@@ -58,6 +61,8 @@ dice_coefs['🎰'][63] = 30 # 777
 dice_coefs['🎰'][21] = 9 # grape x3
 dice_coefs['🎰'][42] = 9 # lemon x3
 
+pending_verifications = {}  # Временное хранилище для проверок {username: random_message}
+
 
 @bot.message_handler(commands=["start"])
 def start(message):
@@ -78,13 +83,48 @@ def register(message):
         bot.reply_to(message, "Invalid wallet address. Please provide a valid Ethereum address.")
         return
 
-    user_wallets[user.username] = wallet_address
+    # Генерация случайного сообщения для подписи
+    random_message = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
+    pending_verifications[user.username] = (wallet_address, random_message)
 
-    registered_msg = f"{user.first_name}, your wallet address {wallet_address} has been registered!\n"
-    registered_msg += f"Send ETH (0.005 ETH = 1 SMPH, 10 SMPTH = 1 roll) to the following address to start playing: {CONTRACT_ADDRESS}"
-    dump_users(user_wallets)
+    bot.reply_to(
+        message,
+        f"To verify your ownership of the wallet, sign the following message with your wallet and send the signature:\n\n`{random_message}`\n\nUse any Ethereum wallet to sign this message (for example use [this](https://etherscan.io/verifiedSignatures)) and send the signature back with the command `/verify <signature>`.",
+        parse_mode="markdown"
+    )
 
-    bot.reply_to(message, registered_msg)
+
+@bot.message_handler(commands=["verify"])
+def verify(message):
+    user = message.from_user
+    args = message.text.split()
+
+    if len(args) != 2:
+        bot.reply_to(message, "Please provide your signature. Usage: /verify <signature>")
+        return
+
+    signature = args[1]
+
+    if user.username not in pending_verifications:
+        bot.reply_to(message, "No pending verification found. Use /register to start the process.")
+        return
+
+    wallet_address, random_message = pending_verifications[user.username]
+
+    try:
+        # Восстановление адреса кошелька из подписи
+        recovered_address = web3.eth.account.recover_message(encode_defunct(text=random_message), signature=signature)
+
+        if recovered_address.lower() == wallet_address.lower():
+            user_wallets[user.username] = wallet_address
+            dump_users(user_wallets)
+
+            bot.reply_to(message, f"Verification successful! Your wallet address {wallet_address} has been registered.")
+            del pending_verifications[user.username]
+        else:
+            bot.reply_to(message, "Verification failed. The signature does not match the wallet address.")
+    except Exception as e:
+        bot.reply_to(message, f"An error occurred during verification: {str(e)}")
 
 
 @bot.message_handler(commands=["balance"])
@@ -179,17 +219,21 @@ def roll(message):
 
     payout = int(coefs[dice_roll - 1] * TOKENS_TO_ROLL)
     tx_hash = None
-    if payout - TOKENS_TO_ROLL > 0:
-        tx_hash = send_token(CONTRACT_ADDRESS, wallet_address, payout - TOKENS_TO_ROLL)
-        # threading.Thread(target=send_prize, args=(wallet_address, payout), daemon=True).start()
-        bot.reply_to(message, f"You win {payout} semaphore tokens! The prize will be sent as soon as possible. [tx](https://sepolia.etherscan.io/tx/0x{tx_hash.hex()})", disable_web_page_preview=True, parse_mode="markdown")
-    elif TOKENS_TO_ROLL - payout > 0:
-        tx_hash = send_token(wallet_address, CONTRACT_ADDRESS, TOKENS_TO_ROLL - payout)
-        bot.reply_to(message, "No payout this time. Better luck next roll!")
 
-    tx_receipt = get_tx_receipt(tx_hash)
-    if tx_receipt['status'] != 1:
-        bot.reply_to(message, "!!! alarm, previous transaction failed !!!")
+    try:
+        if payout - TOKENS_TO_ROLL > 0:
+            tx_hash = send_token(CONTRACT_ADDRESS, wallet_address, payout - TOKENS_TO_ROLL)
+            # threading.Thread(target=send_prize, args=(wallet_address, payout), daemon=True).start()
+            bot.reply_to(message, f"You win {payout} semaphore tokens! The prize will be sent as soon as possible. [tx](https://sepolia.etherscan.io/tx/0x{tx_hash.hex()})", disable_web_page_preview=True, parse_mode="markdown")
+        elif TOKENS_TO_ROLL - payout > 0:
+            tx_hash = send_token(wallet_address, CONTRACT_ADDRESS, TOKENS_TO_ROLL - payout)
+            bot.reply_to(message, "No payout this time. Better luck next roll!")
+
+        tx_receipt = get_tx_receipt(tx_hash)
+        if tx_receipt['status'] != 1:
+            bot.reply_to(message, "!!! alarm, previous transaction failed !!!")
+    except Exception as e:
+        bot.reply_to(message, f"An error occurred during transaction: {str(e)}")
     remove_user(wallet_address)
 
 
