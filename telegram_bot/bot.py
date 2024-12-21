@@ -39,8 +39,9 @@ bot = telebot.TeleBot(os.getenv("TELEGRAM_BOT_TOKEN"))
 
 # Dictionary to store Telegram username -> wallet address mapping
 user_wallets = {}
-with open("users.json", "r") as users_file:
-    user_wallets = json.load(users_file)
+if os.path.exists("users.json"):
+    with open("users.json", "r") as users_file:
+        user_wallets = json.load(users_file)
 
 def dump_users(addresses):
     with open("users.json", "w") as users_file:
@@ -62,7 +63,7 @@ dice_coefs['🎰'][63] = 30 # 777
 dice_coefs['🎰'][21] = 9 # grape x3
 dice_coefs['🎰'][42] = 9 # lemon x3
 
-pending_verifications = {}  # Временное хранилище для проверок {username: random_message}
+pending_verifications = {}
 
 
 @bot.message_handler(commands=["start"])
@@ -84,7 +85,6 @@ def register(message):
         bot.reply_to(message, "Invalid wallet address. Please provide a valid Ethereum address.")
         return
 
-    # Генерация случайного сообщения для подписи
     random_message = ''.join(random.choices(string.ascii_letters + string.digits, k=16))
     pending_verifications[user.username] = (wallet_address, random_message)
 
@@ -113,7 +113,6 @@ def verify(message):
     wallet_address, random_message = pending_verifications[user.username]
 
     try:
-        # Восстановление адреса кошелька из подписи
         recovered_address = web3.eth.account.recover_message(encode_defunct(text=random_message), signature=signature)
 
         if recovered_address.lower() == wallet_address.lower():
@@ -137,7 +136,7 @@ def balance(message):
     balance = contract.functions.balanceOf(wallet_address).call()
 
     balance_msg = f"Your SemaphoreToken balance: {balance} SMPH's, {balance // TOKENS_TO_ROLL} rolls\n"
-    balance_msg += f"Send ETH (0.005 ETH = 1 SMPH, 10 SMPTH = 1 roll) to the following address to start playing: {CONTRACT_ADDRESS}"
+    balance_msg += f"Send ETH (0.005 ETH = 1 SMPH, 10 SMPH = 1 roll) to the following address to start playing: {CONTRACT_ADDRESS}"
 
     bot.reply_to(message, balance_msg)
 
@@ -204,25 +203,14 @@ def roll(message):
 
     if balance < TOKENS_TO_ROLL:
         not_enough_bal_msg = f"You have no balance. Deposit more ETH to roll!!! Current balance {balance}\n"
-        not_enough_bal_msg += f"Send ETH (0.005 ETH = 1 SMPH, 10 SMPTH = 1 roll) to the following address to start playing: {CONTRACT_ADDRESS}"
+        not_enough_bal_msg += f"Send ETH (0.005 ETH = 1 SMPH, 10 SMPH = 1 roll) to the following address to start playing: {CONTRACT_ADDRESS}"
 
         bot.reply_to(message, not_enough_bal_msg)
         remove_user(wallet_address)
         return
 
-    # tx_hash = send_token(wallet_address, CONTRACT_ADDRESS, TOKENS_TO_ROLL)
-    # bot.reply_to(message, "Sending SMPH, please wait...")
-
-    # tx_receipt = get_tx_receipt(tx_hash)
-
-    # if tx_receipt['status'] != 1:
-    #     bot.reply_to(message, f"Transaction for wei failed: [tx](https://sepolia.etherscan.io/tx/0x{tx_hash.hex()} :( Please try again", disable_web_page_preview=True, parse_mode="markdown")
-    #     remove_user(wallet_address)
-    #     return
-
     dice_response = bot.send_dice(message.chat.id, emoji=emoji, reply_to_message_id=message.id)
     dice_roll = dice_response.dice.value
-    # bot.reply_to(message, f"You rolled a {dice_roll}!")
 
     payout = int(coefs[dice_roll - 1] * TOKENS_TO_ROLL)
     tx_hash = None
@@ -230,11 +218,12 @@ def roll(message):
     try:
         if payout - TOKENS_TO_ROLL > 0:
             tx_hash = send_token(CONTRACT_ADDRESS, wallet_address, payout - TOKENS_TO_ROLL)
-            # threading.Thread(target=send_prize, args=(wallet_address, payout), daemon=True).start()
-            bot.reply_to(message, f"You win {payout} semaphore tokens! The prize will be sent as soon as possible. [tx](https://sepolia.etherscan.io/tx/0x{tx_hash.hex()})", disable_web_page_preview=True, parse_mode="markdown")
+            bot.reply_to(message, f"You win {payout} SMPH! The prize will be sent as soon as possible. [tx](https://sepolia.etherscan.io/tx/0x{tx_hash.hex()})", disable_web_page_preview=True, parse_mode="markdown")
         elif TOKENS_TO_ROLL - payout > 0:
             tx_hash = send_token(wallet_address, CONTRACT_ADDRESS, TOKENS_TO_ROLL - payout)
-            bot.reply_to(message, "No payout this time. Better luck next roll!")
+            bot.reply_to(message, f"No payout this time. Cashback: {payout} SMPH. Better luck next roll!")
+        else:
+            bot.reply_to(message, f"No payout this time. Cashback: {TOKENS_TO_ROLL} SMPH. Better luck next roll!")
 
         tx_receipt = get_tx_receipt(tx_hash)
         if tx_receipt['status'] != 1:
@@ -265,7 +254,6 @@ def withdraw(message):
         remove_user(wallet_address)
         return
     withdraw_amount = int(args[1])
-    # print(wallet_address, withdraw_amount)
 
     balance = contract.functions.balanceOf(wallet_address).call()
     if balance < withdraw_amount:
@@ -275,7 +263,6 @@ def withdraw(message):
         return
 
     tx_hash = withdraw_tokens(wallet_address, withdraw_amount)
-    # threading.Thread(target=send_eth, args=(wallet_address, withdraw_amount), daemon=True).start()
     bot.reply_to(message, f"Withdraw success! The ETH will be sent as soon as possible. [tx](https://sepolia.etherscan.io/tx/0x{tx_hash.hex()})", disable_web_page_preview=True, parse_mode="markdown")
     remove_user(wallet_address)
 
@@ -292,6 +279,9 @@ def login(message):
 
 
 def get_tx_receipt(tx_hash):
+    if tx_hash is None:
+        return {'status': 1}
+
     transaction_receipt = None
     while transaction_receipt is None:
         try:
@@ -330,22 +320,6 @@ def withdraw_tokens(receiver, amount):
     tx_hash = web3.eth.send_raw_transaction(signed_tx.raw_transaction)
 
     return tx_hash
-
-
-def send_prize(wallet_address, payout):
-    was_sent = False
-    while not was_sent:
-        tx_hash = send_token(CONTRACT_ADDRESS, wallet_address, payout)
-        tx_receipt = get_tx_receipt(tx_hash)
-        was_sent = tx_receipt['status'] == 1
-
-
-def send_eth(wallet_address, withdraw_amount):
-    was_sent = False
-    while not was_sent:
-        tx_hash = withdraw_tokens(wallet_address, withdraw_amount)
-        tx_receipt = get_tx_receipt(tx_hash)
-        was_sent = tx_receipt['status'] == 1
 
 
 def add_user(wallet):
