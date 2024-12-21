@@ -50,6 +50,7 @@ def dump_users(addresses):
 dice_coefs = {
     '🎲': [0, 0.3, 0.5, 1, 1.6, 2],
     '🏀': [0, 0, 0.5, 2, 2],
+    '⚽️': [0, 0, 1.5, 1.5, 1.5],
     '🎯': [0, 0.1, 0.3, 0.5, 1.5, 3],
     '🎳': [0, 0.1, 0.3, 1, 1.5, 2.5],
     '🎰': [0 for i in range(64)]
@@ -150,6 +151,12 @@ def roll_dice(message):
 @bot.message_handler(commands=["roll_basket"])
 def roll_basket(message):
     message.text = '/roll 🏀'
+    return roll(message)
+
+
+@bot.message_handler(commands=["roll_goll"])
+def roll_goll(message):
+    message.text = '/roll ⚽️'
     return roll(message)
 
 
