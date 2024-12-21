@@ -136,7 +136,7 @@ def balance(message):
     balance = contract.functions.balanceOf(wallet_address).call()
 
     balance_msg = f"Your SemaphoreToken balance: {balance} SMPH's, {balance // TOKENS_TO_ROLL} rolls\n"
-    balance_msg += f"Send ETH (0.005 ETH = 1 SMPH, 10 SMPTH = 1 roll) to the following address to start playing: {CONTRACT_ADDRESS}"
+    balance_msg += f"Send ETH (0.005 ETH = 1 SMPH, 10 SMPH = 1 roll) to the following address to start playing: {CONTRACT_ADDRESS}"
 
     bot.reply_to(message, balance_msg)
 
